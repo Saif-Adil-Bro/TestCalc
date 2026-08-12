@@ -46,7 +46,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         if (_expression.startsWith('-')) {
           _expression = _expression.substring(1);
         } else if (_expression.isNotEmpty) {
-          _expression = '-$_expression';
+          _expression = '-';
         }
       } else if (buttonText == '%') {
         try {

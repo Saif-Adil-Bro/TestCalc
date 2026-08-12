@@ -227,7 +227,7 @@ class _CalculatorVaultScreenState extends State<CalculatorVaultScreen> {
                 alignment: Alignment.bottomRight,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       _expression,
@@ -353,7 +353,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
           padding: const EdgeInsets.all(20.0),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Row(
                 children: [
@@ -486,7 +486,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.all(16),
@@ -501,7 +501,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text('Default Launcher Enabled', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         SizedBox(height: 2),
@@ -617,7 +617,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
         builder: (context, setModalState) => Padding(
           padding: const EdgeInsets.all(20.0),
           child: Column(
-            crossAxisAlignment: CrossAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

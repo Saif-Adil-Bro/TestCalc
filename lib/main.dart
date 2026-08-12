@@ -168,7 +168,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 alignment: Alignment.bottomRight,
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
-                  crossAxisAlignment: CrossAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.end
                   children: [
                     Text(
                       _expression,

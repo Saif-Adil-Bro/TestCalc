@@ -7,6 +7,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:installed_apps/installed_apps.dart';
 import 'package:installed_apps/app_info.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:android_intent_plus/android_intent.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +62,16 @@ class _CalculatorVaultScreenState extends State<CalculatorVaultScreen> {
   void initState() {
     super.initState();
     _loadPin();
+    _requestStoragePermissions();
+  }
+
+  Future<void> _requestStoragePermissions() async {
+    if (Platform.isAndroid) {
+      await Permission.storage.request();
+      if (await Permission.manageExternalStorage.isDenied) {
+        await Permission.manageExternalStorage.request();
+      }
+    }
   }
 
   Future<void> _loadPin() async {
@@ -365,6 +377,24 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
     _loadVaultData();
   }
 
+  Future<void> _openDefaultLauncherSettings() async {
+    if (Platform.isAndroid) {
+      try {
+        const intent = AndroidIntent(
+          action: 'android.settings.HOME_SETTINGS',
+        );
+        await intent.launch();
+      } catch (e) {
+        try {
+          const intent = AndroidIntent(
+            action: 'android.settings.SETTINGS',
+          );
+          await intent.launch();
+        } catch (_) {}
+      }
+    }
+  }
+
   Future<void> _loadVaultData() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -388,7 +418,6 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
     if (!await photosDir.exists()) await photosDir.create(recursive: true);
     if (!await filesDir.exists()) await filesDir.create(recursive: true);
 
-    // Ensure .nomedia exists so gallery apps do not index secret files
     final nomediaPhoto = File('${photosDir.path}/.nomedia');
     if (!await nomediaPhoto.exists()) await nomediaPhoto.create();
 
@@ -429,7 +458,6 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
     await prefs.setStringList('hidden_apps', _hiddenAppPackages.toList());
   }
 
-  // REAL HIDING: Pick photo from gallery -> Copy to private vault -> Remove original from gallery
   Future<void> _pickPhoto() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
@@ -443,17 +471,15 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
       final String originalPath = image.path;
       final String newPath = '${photosDir.path}/${DateTime.now().millisecondsSinceEpoch}_${image.name}';
       
-      // Copy to private app directory
       final File savedImage = await File(originalPath).copy(newPath);
 
-      // Attempt to delete original public file to hide it from Gallery
       try {
         final File originalFile = File(originalPath);
         if (await originalFile.exists()) {
           await originalFile.delete();
         }
       } catch (e) {
-        debugPrint('Note: Original gallery file deletion skipped: ');
+        debugPrint('Original photo deletion skipped: ');
       }
 
       setState(() {
@@ -463,7 +489,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('📸 Photo moved to Vault & hidden from Gallery!'),
+            content: Text('📸 Photo moved to Vault & deleted from Public Gallery!'),
             backgroundColor: Color(0xFF26E07F),
           ),
         );
@@ -471,7 +497,6 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
     }
   }
 
-  // REAL HIDING: Pick document -> Copy to private vault -> Remove original
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
     if (result != null && result.files.single.path != null) {
@@ -502,7 +527,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('📁 Document moved to Vault & hidden from File Manager!'),
+            content: Text('📁 Document moved to Vault & deleted from Public Storage!'),
             backgroundColor: Color(0xFF26E07F),
           ),
         );
@@ -922,7 +947,6 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Filter visible apps for Home Launcher Grid
     final List<AppInfo> visibleLauncherApps = _installedApps.where((app) => !_hiddenAppPackages.contains(app.packageName)).toList();
     final List<AppInfo> hiddenAppsList = _installedApps.where((app) => _hiddenAppPackages.contains(app.packageName)).toList();
 
@@ -1044,17 +1068,16 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Default Launcher Active', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('Set Default Home Launcher', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         SizedBox(height: 2),
-                        Text('Pick any installed app to hide from phone launcher.', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        Text('Tap to open Android Settings & set Calculator as Home App.', style: TextStyle(color: Colors.grey, fontSize: 12)),
                       ],
                     ),
                   ),
-                  ElevatedButton.icon(
+                  ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5A5F)),
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Pick App'),
-                    onPressed: _openAppPickerModal,
+                    onPressed: _openDefaultLauncherSettings,
+                    child: const Text('Set Home'),
                   ),
                 ],
               ),

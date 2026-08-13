@@ -28,7 +28,7 @@ class CalculatorVaultApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Calculator Vault & App Picker',
+      title: 'Calculator Vault & Launcher',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF17181A),
@@ -75,10 +75,6 @@ class _CalculatorVaultScreenState extends State<CalculatorVaultScreen> {
     setState(() {
       _secretPin = newPin;
     });
-  }
-
-  bool _isOperator(String char) {
-    return ['+', '-', '×', '÷', '%'].contains(char);
   }
 
   void _onButtonPressed(String buttonText) {
@@ -135,6 +131,10 @@ class _CalculatorVaultScreenState extends State<CalculatorVaultScreen> {
         _expression += buttonText;
       }
     });
+  }
+
+  bool _isOperator(String char) {
+    return ['+', '-', '×', '÷', '%'].contains(char);
   }
 
   void _showSnackBar(String message) {
@@ -357,6 +357,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
   List<AppInfo> _installedApps = [];
   Set<String> _hiddenAppPackages = {};
   bool _isLoadingApps = true;
+  bool _showHomeLauncherGrid = false;
 
   @override
   void initState() {
@@ -384,12 +385,18 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
     final photosDir = Directory('${appDir.path}/vault_photos');
     final filesDir = Directory('${appDir.path}/vault_files');
 
-    if (await photosDir.exists()) {
-      _hiddenPhotos = photosDir.listSync().whereType<File>().toList();
-    }
-    if (await filesDir.exists()) {
-      _hiddenFiles = filesDir.listSync().whereType<File>().toList();
-    }
+    if (!await photosDir.exists()) await photosDir.create(recursive: true);
+    if (!await filesDir.exists()) await filesDir.create(recursive: true);
+
+    // Ensure .nomedia exists so gallery apps do not index secret files
+    final nomediaPhoto = File('${photosDir.path}/.nomedia');
+    if (!await nomediaPhoto.exists()) await nomediaPhoto.create();
+
+    final nomediaFile = File('${filesDir.path}/.nomedia');
+    if (!await nomediaFile.exists()) await nomediaFile.create();
+
+    _hiddenPhotos = photosDir.listSync().whereType<File>().where((f) => !f.path.endsWith('.nomedia')).toList();
+    _hiddenFiles = filesDir.listSync().whereType<File>().where((f) => !f.path.endsWith('.nomedia')).toList();
 
     try {
       List<AppInfo> apps = await InstalledApps.getInstalledApps(true, true);
@@ -422,6 +429,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
     await prefs.setStringList('hidden_apps', _hiddenAppPackages.toList());
   }
 
+  // REAL HIDING: Pick photo from gallery -> Copy to private vault -> Remove original from gallery
   Future<void> _pickPhoto() async {
     final ImagePicker picker = ImagePicker();
     final XFile? image = await picker.pickImage(source: ImageSource.gallery);
@@ -431,8 +439,22 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
       if (!await photosDir.exists()) {
         await photosDir.create(recursive: true);
       }
+
+      final String originalPath = image.path;
       final String newPath = '${photosDir.path}/${DateTime.now().millisecondsSinceEpoch}_${image.name}';
-      final File savedImage = await File(image.path).copy(newPath);
+      
+      // Copy to private app directory
+      final File savedImage = await File(originalPath).copy(newPath);
+
+      // Attempt to delete original public file to hide it from Gallery
+      try {
+        final File originalFile = File(originalPath);
+        if (await originalFile.exists()) {
+          await originalFile.delete();
+        }
+      } catch (e) {
+        debugPrint('Note: Original gallery file deletion skipped: ');
+      }
 
       setState(() {
         _hiddenPhotos.add(savedImage);
@@ -440,23 +462,38 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('📸 Photo imported into Vault successfully!'), backgroundColor: Color(0xFF26E07F)),
+          const SnackBar(
+            content: Text('📸 Photo moved to Vault & hidden from Gallery!'),
+            backgroundColor: Color(0xFF26E07F),
+          ),
         );
       }
     }
   }
 
+  // REAL HIDING: Pick document -> Copy to private vault -> Remove original
   Future<void> _pickFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles();
     if (result != null && result.files.single.path != null) {
+      final String originalPath = result.files.single.path!;
       final appDir = await getApplicationDocumentsDirectory();
       final filesDir = Directory('${appDir.path}/vault_files');
       if (!await filesDir.exists()) {
         await filesDir.create(recursive: true);
       }
+
       final String originalName = result.files.single.name;
       final String newPath = '${filesDir.path}/${DateTime.now().millisecondsSinceEpoch}_$originalName';
-      final File savedFile = await File(result.files.single.path!).copy(newPath);
+      final File savedFile = await File(originalPath).copy(newPath);
+
+      try {
+        final File originalFile = File(originalPath);
+        if (await originalFile.exists()) {
+          await originalFile.delete();
+        }
+      } catch (e) {
+        debugPrint('Original file deletion skipped: ');
+      }
 
       setState(() {
         _hiddenFiles.add(savedFile);
@@ -464,7 +501,10 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('📁 File imported into Vault successfully!'), backgroundColor: Color(0xFF26E07F)),
+          const SnackBar(
+            content: Text('📁 Document moved to Vault & hidden from File Manager!'),
+            backgroundColor: Color(0xFF26E07F),
+          ),
         );
       }
     }
@@ -506,7 +546,6 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
     );
   }
 
-  // SEARCHABLE DYNAMIC APP PICKER
   void _openAppPickerModal() {
     TextEditingController searchController = TextEditingController();
     List<AppInfo> filteredApps = List.from(_installedApps);
@@ -883,7 +922,75 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Filter visible apps for Home Launcher Grid
+    final List<AppInfo> visibleLauncherApps = _installedApps.where((app) => !_hiddenAppPackages.contains(app.packageName)).toList();
     final List<AppInfo> hiddenAppsList = _installedApps.where((app) => _hiddenAppPackages.contains(app.packageName)).toList();
+
+    if (_showHomeLauncherGrid) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Home Launcher Grid'),
+          backgroundColor: const Color(0xFF2E2F38),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.dashboard, color: Color(0xFF26E07F)),
+              tooltip: 'Back to Vault',
+              onPressed: () {
+                setState(() {
+                  _showHomeLauncherGrid = false;
+                });
+              },
+            ),
+          ],
+        ),
+        body: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Home Apps (${visibleLauncherApps.length} Visible, ${_hiddenAppPackages.length} Hidden)',
+                style: const TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
+                  itemCount: visibleLauncherApps.length,
+                  itemBuilder: (context, index) {
+                    final app = visibleLauncherApps[index];
+                    return GestureDetector(
+                      onTap: () {
+                        InstalledApps.startApp(app.packageName);
+                      },
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          app.icon != null
+                              ? Image.memory(app.icon!, width: 48, height: 48, gaplessPlayback: true)
+                              : const Icon(Icons.android, size: 44, color: Color(0xFF26E07F)),
+                          const SizedBox(height: 6),
+                          Text(
+                            app.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11, color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -896,6 +1003,15 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
         ),
         backgroundColor: const Color(0xFF2E2F38),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.grid_view, color: Color(0xFF26E07F)),
+            tooltip: 'View Home Launcher Grid',
+            onPressed: () {
+              setState(() {
+                _showHomeLauncherGrid = true;
+              });
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.key),
             tooltip: 'Change Secret PIN',
@@ -968,7 +1084,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
                   _buildVaultCard(
                     icon: Icons.apps_outage,
                     title: 'Hidden Apps',
-                    count: '${hiddenAppsList.length} Apps Picked',
+                    count: '${hiddenAppsList.length} Apps Hidden',
                     color: const Color(0xFFFF5A5F),
                     onTap: _openAppPickerModal,
                   ),

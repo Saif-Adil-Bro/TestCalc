@@ -695,7 +695,7 @@ class _VaultDashboardScreenState extends State<VaultDashboardScreen> {
                                   },
                                   child: const CircleAvatar(
                                     radius: 12,
-                                    backgroundColor: Colors.black80,
+                                    backgroundColor: Colors.black87,
                                     child: Icon(Icons.close, size: 14, color: Colors.red),
                                   ),
                                 ),
